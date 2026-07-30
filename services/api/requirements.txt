@@ -9,7 +9,10 @@ python-dotenv>=1.0.0
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
 boto3>=1.35.0
-Pillow>=11.0.0
+# Pillow floor is 10.3.0 (not 11.x): docling-core requires pillow<11, so an
+# 11.x floor makes the full Docling stack unresolvable. 10.3.0 is docling's
+# minimum and is plenty for the metadata-extraction feature (PIL.Image/ExifTags).
+Pillow>=10.3.0
 PyPDF2>=3.0.0
 
 # Document ingestion (the sample's headline capability). Docling pulls a large
