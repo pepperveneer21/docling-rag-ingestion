@@ -75,3 +75,14 @@ Low-severity polish, left for a follow-up; none blocks the core flow.
 | Custom `FileNotFoundError` shadowed the built-in | Renamed to `FileNotFoundServiceError` |
 | Dropzone accepted any file type client-side | `accept` allow-list mirroring backend `ALLOWED_TYPES` (tested for drift) |
 | No test harness for feature specs | pytest suite across upload, files, activity, errors, validation, rate limit, pagination |
+
+## 2026-07-30 — verify
+
+Nitpicks surfaced during the `/documents` ingestion verify pass (backlog-only; none block the first-time-user goal). Evidence under `.local/verify/`:
+
+- Document detail → **Raw source** tab — the inline PDF preview embeds an `<iframe>`/embed on a valid presigned B2 URL but offers no fallback affordance when it doesn't render (headless or PDF-viewer-less browsers show a blank pane); add an "Open in new tab" / "Download" link. (`.local/verify/A/14-raw-probe.png`)
+- Write-amplification stat (detail + list + dashboard) — the ratio is labelled "Amplification" but is <1× for PDF inputs (extracted text is smaller than the compressed binary source, e.g. 0.124×); the number is honestly computed and always shown with the raw→derived byte breakdown, so consider softer wording (e.g. "Raw → Derived ratio") than "Amplification". (`.local/verify/C/07-dashboard.png`)
+- Add-document dialog — the hint under "Max tokens per chunk" is a static string ("512 tokens + Markdown export suits most PDFs") that does not reflect the currently-selected export-format / token config. (`.local/verify/C/01-add-dialog-nondefault.png`)
+- JSON-export **Parsed** tab — the `<pre>` JSON block overflows horizontally on long lines (content stays scrollable/readable in-viewport); consider soft-wrap or a max-width. (`.local/verify/C/r2-13-parsed-json.png`)
+- `/documents` Add → Ingest are two deliberate steps (no auto-chain); intentional and clearly signposted (Pending badge + prominent Ingest button + toast), but a combined "Add & Ingest" affordance would streamline the common single-document case. (`.local/verify/A/06-row-appears.png`)
+- Reconfirmed (already tracked as the Open "`GET /files` has no pagination" row): the `/files` full-bucket explorer caps at the 100 most-recent objects with no navigation to older prefixes, so freshly-added corpus docs aren't reachable there when the bucket holds many objects; the scoped `/documents` corpus library is unaffected. (`.local/verify/C/r2-15-files-tree.png`)

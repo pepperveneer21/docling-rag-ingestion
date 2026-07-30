@@ -49,7 +49,15 @@ with the source — the sample's headline capability.
 
 ## UX States
 - Empty: "No documents in the corpus yet"
-- Loading: progress bar on upload; toast during ingest
+- Loading (upload): determinate progress bar driven by the real byte-upload percent
+- Loading (ingest): the ingest button shows an "Ingesting…" spinner while a sonner
+  loading toast renders `IngestProgress` — an advancing estimate for the whole wait.
+  Because the ingest API is a single blocking call that returns the finished
+  manifest (no sub-step streaming), the bar is an HONEST time-driven estimate: it
+  eases toward ~90% (never 100% until the real result arrives) while the stage
+  label advances through the fixed pipeline stages — "Reading source from B2…" →
+  "Parsing layout & tables…" → "Chunking…" → "Writing to B2…". On completion the
+  loading toast is replaced by the success (chunk/table counts) or error toast.
 - Error: 415/409/500 surfaced as toasts; failed status shown on the row and detail
 
 ## Verification

@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EditConfigDialog } from "@/components/documents/edit-config-dialog";
+import { IngestProgress } from "@/components/documents/ingest-progress";
 import { useDeleteDocument, useIngestDocument } from "@/lib/document-queries";
 import { ApiError } from "@/lib/api-client";
 import type { DocumentSummary, DocumentConfig } from "@docling-rag-ingestion/shared";
@@ -41,9 +42,10 @@ export function DocumentRowActions({
   const ingesting = ingest.isPending && ingest.variables === doc.doc_id;
 
   const runIngest = () => {
-    const toastId = toast.loading(`Ingesting ${doc.filename}…`, {
-      description: "First run downloads Docling models — this can take a while.",
-    });
+    // A single blocking ingest can run ~11s (longer on a cold first run). Show an
+    // advancing, honest progress indicator for the whole wait instead of a static
+    // spinner + fixed text — see IngestProgress.
+    const toastId = toast.loading(<IngestProgress filename={doc.filename} />);
     ingest.mutate(doc.doc_id, {
       onSuccess: (m) =>
         toast.success(`Ingested ${doc.filename}`, {
