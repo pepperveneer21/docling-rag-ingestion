@@ -1,6 +1,35 @@
 {
   "components": {
     "schemas": {
+      "Body_create_document_endpoint_documents_post": {
+        "properties": {
+          "export_format": {
+            "default": "markdown",
+            "title": "Export Format",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "max_tokens": {
+            "default": 512,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "merge_peers": {
+            "default": true,
+            "title": "Merge Peers",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_document_endpoint_documents_post",
+        "type": "object"
+      },
       "Body_upload_upload_post": {
         "properties": {
           "file": {
@@ -31,6 +60,427 @@
           "uploads"
         ],
         "title": "DailyUploadCount",
+        "type": "object"
+      },
+      "DocumentChunk": {
+        "description": "One token-aware chunk emitted by Docling's HybridChunker.",
+        "properties": {
+          "char_count": {
+            "default": 0,
+            "title": "Char Count",
+            "type": "integer"
+          },
+          "headings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Headings",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "page_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page No"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "text"
+        ],
+        "title": "DocumentChunk",
+        "type": "object"
+      },
+      "DocumentChunksResponse": {
+        "description": "Paged-for-the-UI chunk payload. `truncated` is surfaced, never silent.",
+        "properties": {
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentChunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "integer"
+          },
+          "total_chunks": {
+            "title": "Total Chunks",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doc_id",
+          "total_chunks",
+          "returned",
+          "truncated",
+          "chunks"
+        ],
+        "title": "DocumentChunksResponse",
+        "type": "object"
+      },
+      "DocumentConfig": {
+        "description": "Per-document ingestion configuration, persisted in the manifest.\n\n`edit` mutates this without re-running; the next `ingest` reads whatever is\nstored here. A document's raw bytes are immutable, so the config is the only\nthing there is to edit.",
+        "properties": {
+          "export_format": {
+            "default": "markdown",
+            "enum": [
+              "markdown",
+              "json",
+              "html",
+              "text"
+            ],
+            "title": "Export Format",
+            "type": "string"
+          },
+          "max_tokens": {
+            "default": 512,
+            "enum": [
+              256,
+              512,
+              1024
+            ],
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "merge_peers": {
+            "default": true,
+            "title": "Merge Peers",
+            "type": "boolean"
+          }
+        },
+        "title": "DocumentConfig",
+        "type": "object"
+      },
+      "DocumentConfigUpdate": {
+        "description": "PATCH body for editing a document's stored ingestion config.",
+        "properties": {
+          "export_format": {
+            "enum": [
+              "markdown",
+              "json",
+              "html",
+              "text"
+            ],
+            "title": "Export Format",
+            "type": "string"
+          },
+          "max_tokens": {
+            "enum": [
+              256,
+              512,
+              1024
+            ],
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "merge_peers": {
+            "title": "Merge Peers",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "export_format",
+          "max_tokens",
+          "merge_peers"
+        ],
+        "title": "DocumentConfigUpdate",
+        "type": "object"
+      },
+      "DocumentManifest": {
+        "description": "The corpus's source of truth for one document (stored as manifest.json).",
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/DocumentConfig"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "raw_bytes": {
+            "default": 0,
+            "title": "Raw Bytes",
+            "type": "integer"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "enum": [
+              "pending",
+              "ingested",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "doc_id",
+          "filename",
+          "source_key",
+          "content_type",
+          "created_at"
+        ],
+        "title": "DocumentManifest",
+        "type": "object"
+      },
+      "DocumentResult": {
+        "description": "Outcome of a successful ingest run \u2014 the derived-artifact bookkeeping.",
+        "properties": {
+          "chunk_count": {
+            "default": 0,
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "chunks_key": {
+            "title": "Chunks Key",
+            "type": "string"
+          },
+          "derived_bytes": {
+            "default": 0,
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "ingested_at": {
+            "title": "Ingested At",
+            "type": "string"
+          },
+          "page_count": {
+            "default": 0,
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "parsed_key": {
+            "title": "Parsed Key",
+            "type": "string"
+          },
+          "raw_bytes": {
+            "default": 0,
+            "title": "Raw Bytes",
+            "type": "integer"
+          },
+          "table_count": {
+            "default": 0,
+            "title": "Table Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "parsed_key",
+          "chunks_key",
+          "ingested_at"
+        ],
+        "title": "DocumentResult",
+        "type": "object"
+      },
+      "DocumentStats": {
+        "description": "Corpus-wide aggregates for the dashboard, incl. write amplification.",
+        "properties": {
+          "amplification_ratio": {
+            "title": "Amplification Ratio",
+            "type": "number"
+          },
+          "derived_bytes": {
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "derived_bytes_human": {
+            "title": "Derived Bytes Human",
+            "type": "string"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "ingested": {
+            "title": "Ingested",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "raw_bytes": {
+            "title": "Raw Bytes",
+            "type": "integer"
+          },
+          "raw_bytes_human": {
+            "title": "Raw Bytes Human",
+            "type": "string"
+          },
+          "total_chunks": {
+            "title": "Total Chunks",
+            "type": "integer"
+          },
+          "total_documents": {
+            "title": "Total Documents",
+            "type": "integer"
+          },
+          "total_pages": {
+            "title": "Total Pages",
+            "type": "integer"
+          },
+          "total_tables": {
+            "title": "Total Tables",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_documents",
+          "ingested",
+          "pending",
+          "failed",
+          "total_chunks",
+          "total_pages",
+          "total_tables",
+          "raw_bytes",
+          "raw_bytes_human",
+          "derived_bytes",
+          "derived_bytes_human",
+          "amplification_ratio"
+        ],
+        "title": "DocumentStats",
+        "type": "object"
+      },
+      "DocumentSummary": {
+        "description": "Row shape for the /documents list \u2014 flattened for the table.\n\nCarries the stored `config` so the list's per-row \"Edit config\" opens\npre-filled without a second round-trip.",
+        "properties": {
+          "amplification": {
+            "title": "Amplification",
+            "type": "number"
+          },
+          "chunk_count": {
+            "title": "Chunk Count",
+            "type": "integer"
+          },
+          "config": {
+            "$ref": "#/components/schemas/DocumentConfig"
+          },
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "derived_bytes": {
+            "title": "Derived Bytes",
+            "type": "integer"
+          },
+          "derived_bytes_human": {
+            "title": "Derived Bytes Human",
+            "type": "string"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "page_count": {
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "raw_bytes": {
+            "title": "Raw Bytes",
+            "type": "integer"
+          },
+          "raw_bytes_human": {
+            "title": "Raw Bytes Human",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "ingested",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "table_count": {
+            "title": "Table Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "doc_id",
+          "filename",
+          "content_type",
+          "status",
+          "config",
+          "page_count",
+          "table_count",
+          "chunk_count",
+          "raw_bytes",
+          "raw_bytes_human",
+          "derived_bytes",
+          "derived_bytes_human",
+          "amplification",
+          "created_at"
+        ],
+        "title": "DocumentSummary",
         "type": "object"
       },
       "FileMetadata": {
@@ -321,6 +771,46 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ParsedDocumentResponse": {
+        "description": "Rendered parsed output (Markdown by default) with an explicit size cap.",
+        "properties": {
+          "byte_count": {
+            "title": "Byte Count",
+            "type": "integer"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "doc_id": {
+            "title": "Doc Id",
+            "type": "string"
+          },
+          "export_format": {
+            "enum": [
+              "markdown",
+              "json",
+              "html",
+              "text"
+            ],
+            "title": "Export Format",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doc_id",
+          "export_format",
+          "content",
+          "truncated",
+          "byte_count"
+        ],
+        "title": "ParsedDocumentResponse",
+        "type": "object"
+      },
       "UploadStats": {
         "properties": {
           "total_downloads": {
@@ -398,11 +888,395 @@
   },
   "info": {
     "description": "File upload and management API backed by Backblaze B2",
-    "title": "OSS Starter Kit API",
+    "title": "Docling RAG Ingestion API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/documents": {
+      "get": {
+        "operationId": "list_documents_endpoint_documents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentSummary"
+                  },
+                  "title": "Response List Documents Endpoint Documents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Documents Endpoint",
+        "tags": [
+          "documents"
+        ]
+      },
+      "post": {
+        "operationId": "create_document_endpoint_documents_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_document_endpoint_documents_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Document Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/stats": {
+      "get": {
+        "operationId": "document_stats_endpoint_documents_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Document Stats Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}": {
+      "delete": {
+        "operationId": "delete_document_endpoint_documents__doc_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Document Endpoint",
+        "tags": [
+          "documents"
+        ]
+      },
+      "get": {
+        "operationId": "get_document_endpoint_documents__doc_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Document Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}/chunks": {
+      "get": {
+        "operationId": "get_document_chunks_endpoint_documents__doc_id__chunks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentChunksResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Document Chunks Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}/config": {
+      "patch": {
+        "operationId": "update_document_config_endpoint_documents__doc_id__config_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DocumentConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Document Config Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}/ingest": {
+      "post": {
+        "operationId": "ingest_document_endpoint_documents__doc_id__ingest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentManifest"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Document Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}/parsed": {
+      "get": {
+        "operationId": "get_document_parsed_endpoint_documents__doc_id__parsed_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsedDocumentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Document Parsed Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/documents/{doc_id}/source": {
+      "get": {
+        "description": "Presigned inline URL for the raw source (reused media preview iframe).",
+        "operationId": "get_document_source_endpoint_documents__doc_id__source_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "doc_id",
+            "required": true,
+            "schema": {
+              "title": "Doc Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Document Source Endpoint",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/files": {
       "get": {
         "operationId": "list_files_endpoint_files_get",

@@ -2,11 +2,20 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    b2_endpoint: str = "https://s3.us-west-004.backblazeb2.com"
-    b2_key_id: str = ""
+    # Standardized B2 env-var names (see docs/SECURITY.md and .env.example).
+    # The S3 endpoint is DERIVED from the region rather than configured directly:
+    # every B2 S3 endpoint follows https://s3.{region}.backblazeb2.com, so one
+    # region string (e.g. "us-west-004") is enough and there is no separate
+    # endpoint env var to keep in sync.
+    b2_application_key_id: str = ""
     b2_application_key: str = ""
     b2_bucket_name: str = ""
-    b2_public_url: str = ""
+    # Defaulted so it is never "missing" at startup; override to match the
+    # region your bucket lives in.
+    b2_region: str = "us-west-004"
+    # Optional. Only used to build public object URLs for a public bucket; the
+    # app runs without it. Empty string means "no public base configured".
+    b2_public_url_base: str = ""
 
     api_port: int = 8000
     # Interactive API docs (/docs, /redoc, /openapi.json). On by default for
@@ -66,6 +75,16 @@ class Settings(BaseSettings):
     download_count_file: str = ".data/download_count.json"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def b2_endpoint(self) -> str:
+        """S3-compatible endpoint derived from the region.
+
+        Kept as a property (not an env var) so the region is the single source
+        of truth — no hardcoded region strings live in source, and there is no
+        endpoint/region pair that can drift apart.
+        """
+        return f"https://s3.{self.b2_region}.backblazeb2.com"
 
     @property
     def cors_origins(self) -> list[str]:

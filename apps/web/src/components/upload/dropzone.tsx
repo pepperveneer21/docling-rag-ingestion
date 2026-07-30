@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useId } from "react";
-import { useDropzone, type FileRejection } from "react-dropzone";
+import { useDropzone, type Accept, type FileRejection } from "react-dropzone";
 import { Upload, FileIcon } from "lucide-react";
 import { ACCEPTED_FILE_TYPES } from "@/lib/upload-file-types";
 
@@ -9,6 +9,13 @@ interface DropzoneProps {
   onFilesSelected: (files: File[]) => void;
   onFilesRejected: (rejections: FileRejection[]) => void;
   disabled?: boolean;
+  /** Override the accepted MIME/extension map. Defaults to the upload set. */
+  accept?: Accept;
+  /** Allow selecting multiple files. Defaults to true (the upload queue). */
+  multiple?: boolean;
+  /** Idle-state copy overrides for reuse outside the upload page. */
+  idleTitle?: string;
+  idleDescription?: string;
 }
 
 const MAX_SIZE = 100 * 1024 * 1024; // 100MB
@@ -17,6 +24,10 @@ export function Dropzone({
   onFilesSelected,
   onFilesRejected,
   disabled,
+  accept = ACCEPTED_FILE_TYPES,
+  multiple = true,
+  idleTitle = "Drag & drop files here, or click to browse",
+  idleDescription = "Max file size: 100 MB per file",
 }: DropzoneProps) {
   const descriptionId = useId();
   const onDrop = useCallback(
@@ -38,15 +49,15 @@ export function Dropzone({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     onDropRejected,
-    accept: ACCEPTED_FILE_TYPES,
+    accept,
     maxSize: MAX_SIZE,
     disabled,
-    multiple: true,
+    multiple,
   });
 
   const active = isDragActive && !disabled;
-  let title = "Drag & drop files here, or click to browse";
-  let description = "Max file size: 100 MB per file";
+  let title = idleTitle;
+  let description = idleDescription;
 
   if (disabled) {
     title = "Uploads in progress";

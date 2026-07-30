@@ -3,6 +3,34 @@
 
 User journeys inside the application.
 
+## Ingest a Document (primary journey)
+
+- User navigates to `/documents` — the Corpus library, scoped to the app's own
+  `corpus/` prefix (distinct from the full-bucket `/files` Explorer)
+- Clicks **Add Document** → a dialog with a dropzone (accepts PDF, DOCX, PPTX,
+  HTML, MD, TXT — one file at a time) and an ingestion-config form
+- The config fields are **selectors, not free text**: Export format (Markdown /
+  JSON / HTML / Text), Max tokens per chunk (256 / 512 / 1024), and a Merge-peers
+  switch. Safe-default guidance appears as field descriptions on the create form
+  (e.g. "512 tokens + Markdown export suits most PDFs") — guidance only, no autofill
+- On submit: the raw source streams to B2 (progress bar) and a `manifest.json` is
+  written with `status: pending`. The document appears in the list
+- User clicks **Ingest** on the row (or detail). The API reads the raw bytes back
+  from B2, runs Docling (`DocumentConverter` + `HybridChunker`), and writes
+  `parsed.md` + `chunks.jsonl` next to the source, then marks the manifest
+  `ingested`. The first ingest downloads Docling's models (~500 MB–1 GB) and can
+  take a while; the toast says so
+- User opens the document (`/documents/[id]`): a Raw / Parsed / Chunks tabbed view
+  with the raw preview (presigned inline iframe), the rendered parsed Markdown
+  (tables paint via react-markdown + remark-gfm), a chunk browser, and the
+  write-amplification stat (raw → derived bytes, ratio)
+- **Edit config**: opens pre-filled from the stored config. Saving updates the
+  manifest's config but does **not** re-run; the next Ingest uses it. (A source
+  doc's bytes are immutable, so "edit" edits the ingestion config)
+- **Re-ingest / Delete**: re-running overwrites the derived artifacts; deleting
+  removes every object under `corpus/<doc-id>/` (confirmation dialog)
+- See: [Document Ingestion](features/document-ingestion.md), [Corpus Library](features/corpus-library.md)
+
 ## Upload Files
 
 - User navigates to `/upload`
@@ -34,12 +62,15 @@ User journeys inside the application.
 ## View Dashboard
 
 - User navigates to `/` (home)
-- Three parallel API calls load: stats, recent files, upload activity — all served from one shared bucket listing that the API warms at startup
-- While stats load, the page states it in words above the cards rather than showing silent skeletons
-- Stats cards show: total files, storage used, uploads today, total downloads
-- Upload chart shows last 7 days of upload activity as bar chart
-- Recent uploads table shows last 10 files with filename, size, type, date. Each filename links to that file's preview on `/files` — `/files` teaches "click a file to preview it", so the same gesture here has to answer rather than being inert text
-- Empty state: "No files uploaded yet" messages
+- Stat cards show ingestion metrics from `GET /documents/stats`: total documents,
+  ingested, pending, and total chunks
+- The **Write amplification** panel compares raw-source bytes vs. Docling-derived
+  bytes across the corpus, with the amplification ratio and pages/tables totals —
+  the headline B2 story (one raw doc fans out into parsed + chunk artifacts)
+- The **Recent documents** table shows the latest documents with status and chunk
+  counts; each filename links to that document's detail view
+- Empty states: "No documents yet" / "No ingested documents yet" until the first
+  ingest produces derived bytes
 - See: [Dashboard](features/dashboard.md)
 
 ## Change Preferences

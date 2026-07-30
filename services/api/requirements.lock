@@ -49,3 +49,10 @@ uvicorn==0.51.0
 uvloop==0.22.1
 watchfiles==1.2.0
 websockets==16.1.1
+# Document-ingestion stack. These two are pinned here; their large transitive
+# dependency set (torch/torchvision, docling-core, etc.) is resolved by pip at
+# install time and gets fully pinned when this lock is regenerated from a clean
+# env per docs/dev-workflows.md#python-dependency-updates. Imports are lazy
+# (app/repo/docling_engine.py), so verify:api installs and runs without them.
+docling==2.7.0
+transformers==4.40.0

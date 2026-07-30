@@ -4,19 +4,19 @@
 ## Components
 
 - **apps/web/** — Next.js 16 frontend (App Router, Tailwind v4, shadcn/ui)
-  - Dashboard with stats, upload chart, recent uploads
-  - File upload with drag-and-drop, progress tracking
-  - File browser with preview, download, delete
+  - Dashboard with ingestion metrics and write-amplification panel
+  - Documents (Corpus library) — add / ingest / edit-config / delete, plus a
+    detail view with raw preview, rendered Markdown (react-markdown + remark-gfm
+    so extracted tables paint), and a chunk browser
+  - File upload with drag-and-drop, and the full-bucket file browser
   - Dark mode via `next-themes`
 - **services/api/** — FastAPI backend (layered architecture)
-  - REST API for file upload, listing, deletion
-  - B2 S3 integration via boto3
-  - File metadata extraction (images, PDFs)
-  - Health check endpoint with B2 connectivity verification
+  - Document ingestion: read raw from B2 → Docling parse+chunk → write derived artifacts back
+  - B2 S3 integration via boto3 (source AND sink for the whole pipeline)
+  - File metadata extraction (images, PDFs); health + Prometheus metrics
   - Structured JSON logging with request tracing
-  - Prometheus-format metrics endpoint
 - **packages/shared/** — TypeScript type definitions
-  - Mirrors Pydantic models from the API
+  - Mirrors Pydantic models from the API (files + documents)
   - Consumed by `apps/web/` as workspace dependency
 
 ## Backend Layering
@@ -75,16 +75,58 @@ services/api/
   staging/production contract live in [infra/railway/README.md](infra/railway/README.md).
   External provisioning and deployment remain explicit user-approved actions.
 
+## Corpus key layout (dual-layer, matching keys)
+
+One folder per document holds the raw source and every derived artifact
+side-by-side, so raw and derived sit literally under a matching key:
+
+```
+corpus/<doc-id>/source.<ext>     raw upload (immutable)
+corpus/<doc-id>/parsed.<ext>     Docling export (Markdown by default)
+corpus/<doc-id>/chunks.jsonl     one JSON chunk record per line
+corpus/<doc-id>/manifest.json    status + config + result counts (source of truth)
+```
+
+`<doc-id>` = `slugify(filename-stem) + "-" + uuid4().hex[:8]`. Lists and deletes
+are scoped to the `corpus/` prefix, so shared-bucket data is never touched. The
+corpus listing is derived from the `*/manifest.json` objects (one GET per doc).
+This is deliberately simple and fine at demo scale; **a production system would
+maintain an index (DB / catalog) instead of GET-per-doc.**
+
+## Ingestion data flow
+
+```
+Add:    Browser → POST /documents (multipart) → PutObject source.<ext>
+                → write manifest.json (status=pending)
+Ingest: Browser → POST /documents/{id}/ingest → GetObject source
+                → repo/docling_engine parse+chunk (DocumentConverter + HybridChunker)
+                → PutObject parsed.<ext> + chunks.jsonl → update manifest (status=ingested)
+Read:   Browser → GET /documents[/{id}[/parsed|/chunks|/source]] ← manifests/artifacts
+Edit:   Browser → PATCH /documents/{id}/config → update manifest.config (no re-run)
+Delete: Browser → DELETE /documents/{id} → delete every object under corpus/{id}/
+```
+
+The Docling / transformers stack lives **only** in
+`services/api/app/repo/docling_engine.py`, with **lazy imports** (inside
+functions) so importing the module never pulls torch/docling — that keeps
+`pnpm verify:api` fast and lets the ingestion service be tested with the engine
+stubbed. Device selection auto-detects CUDA → Apple MPS → CPU and defaults to CPU.
+
 ## Data Stores
 
-- **Backblaze B2** — object storage (S3-compatible API)
-  - All uploaded files stored in a single bucket
-  - File listing and metadata via S3 `list_objects_v2` / `head_object`
-  - No application database — B2 is the sole data store
+- **Backblaze B2** — object storage (S3-compatible API), source AND sink
+  - Raw sources, derived artifacts, and per-document manifests in one bucket
+  - Listing and metadata via S3 `list_objects_v2` / `head_object`; reads via
+    `get_object`; writes via `put_object`; presigned GETs for inline preview
+  - No application database — the per-document `manifest.json` on B2 is the
+    corpus source of truth
 
 ## External Services
 
 - **Backblaze B2 S3 API** — file storage, retrieval, deletion, presigned URLs
+- **Docling** (on-device, no API key) — document parsing (`DocumentConverter`)
+  and token-aware chunking (`HybridChunker`); models are downloaded on first
+  use and cached. Confined to `repo/docling_engine.py`.
 
 ## Trust Boundaries
 
@@ -122,10 +164,13 @@ silently drift from FastAPI. `GET /metrics` is intentionally server-only.
 
 ## Canonical Files
 
-- Layered API handler: `services/api/app/runtime/upload.py`
-- Service orchestration: `services/api/app/service/upload.py`
+- Ingestion route handler: `services/api/app/runtime/documents.py`
+- Ingestion orchestration: `services/api/app/service/ingestion.py`
+- Docling engine (external SDK, lazy imports): `services/api/app/repo/docling_engine.py`
+- Corpus storage (S3-only): `services/api/app/repo/corpus.py`
+- Layered API handler (upload demo): `services/api/app/runtime/upload.py`
 - B2 data access (repo layer): `services/api/app/repo/b2_client.py`
-- Pydantic models: `services/api/app/types/` (`files.py`, `upload.py`, `stats.py`, `formatting.py`)
+- Pydantic models: `services/api/app/types/` (`documents.py`, `files.py`, `upload.py`, `stats.py`)
 - Config (pydantic-settings): `services/api/app/config/settings.py`
 - Structural tests: `services/api/tests/test_structure.py`
 - OpenAPI contract: `docs/api/openapi.json`
@@ -135,9 +180,11 @@ silently drift from FastAPI. `GET /metrics` is intentionally server-only.
 
 ## Core Features
 
+- [Document Ingestion](docs/features/document-ingestion.md)
+- [Corpus Library](docs/features/corpus-library.md)
+- [Dashboard](docs/features/dashboard.md)
 - [File Upload](docs/features/file-upload.md)
 - [File Browser](docs/features/file-browser.md)
-- [Dashboard](docs/features/dashboard.md)
 - [Metadata Extraction](docs/features/metadata-extraction.md)
 
 ## References

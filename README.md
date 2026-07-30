@@ -1,44 +1,52 @@
-<!-- last_verified: 2026-07-29 -->
-# Vibe Coding Starter Kit
+<!-- last_verified: 2026-07-30 -->
+# Docling RAG Ingestion
 
-Stop wiring boilerplate and start building. This open-source starter kit gives vibe coders and AI coding agents a production-ready foundation — a full-stack TypeScript + Python template with a pre-built dashboard UI, file upload system, and **[Backblaze B2](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)** cloud storage already integrated. Save thousands of tokens on setup prompts, skip the "build me a dashboard from scratch" loop, and go straight to building your app's unique features.
+Turn a messy bucket of PDFs into a versioned, RAG-ready corpus — on
+**[Backblaze B2](https://www.backblaze.com/cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-docling-rag-ingestion)**.
+Drop a raw document (PDF / DOCX / PPTX / HTML) onto B2; [Docling](https://github.com/docling-project/docling)
+reads it back, extracts structure (headings, reading order, **tables**), and
+produces clean Markdown plus token-aware, metadata-rich chunks. The Markdown and
+chunk JSONL land **back on B2, side-by-side with the raw source under a matching
+key** — a dual-layer corpus you can point any embedding or vector store at.
+
+B2 is both **source and sink** for the whole pipeline, accessed only through the
+S3-compatible API with a custom user agent and the standard `B2_*` env vars. It
+runs on local open-source models — **no second API key, B2 credentials only.**
+
+**The headline B2 story is write amplification:** every raw document fans out
+into parsed + chunk artifacts, and the app surfaces the raw-vs-derived byte ratio
+per document and across the corpus.
 
 **What you get out of the box:**
-- Full-stack dashboard UI (Next.js 16 + React 19 + Tailwind v4 + shadcn/ui)
-- File upload with drag-and-drop, progress tracking, and metadata extraction
-- File browser with preview, download, and delete
-- FastAPI backend with strict layered architecture and structural tests
+- Document ingestion with Docling — raw → clean Markdown + token-aware chunks, written back to B2
+- A dual-layer, versioned corpus (`source` + `parsed` + `chunks` + `manifest`) under one key per document
+- A scoped Corpus library (`/documents`) plus the full-bucket File Explorer (`/files`) and Upload demo
+- Write-amplification insight front-and-center on the dashboard
+- FastAPI backend with strict layered architecture, structural tests, and a checked OpenAPI contract
 - Agent-optimized docs — your AI coding agent can read the repo and start contributing immediately
 
-## What it looks like
-
-**Dashboard** — stats, upload activity, and recent uploads at a glance:
-
-![Dashboard view showing stat cards, upload activity chart, and recent uploads table](docs/images/b2-starterkit-dashboard1.png)
-
-**File browser** — tree view with preview, download, and delete:
-
-![File browser view showing a tree of files with hover actions](docs/images/b2-starterkit-fileview2.png)
+Audience: developers and data engineers building RAG systems who want a
+reproducible, object-storage-native ingestion pattern.
 
 ## Agent-First Architecture
 
-This repo is optimized for coding agents. Use the template, point your agent at it, and start building.
+This repo is optimized for coding agents. The structure follows the principle
+that **repository knowledge is the system of record** — everything an agent needs
+to reason about the codebase is versioned, co-located, and discoverable.
 
-The structure follows the principle that **repository knowledge is the system of record**. Anything an agent can't access in-context doesn't exist — so everything it needs to reason about the codebase is versioned, co-located, and discoverable from the repo itself.
+**[AGENTS.md](AGENTS.md) is the single source of truth for all coding agents.**
+Agent-specific files (CLAUDE.md, GEMINI.md, Copilot instructions) are thin
+pointers back to AGENTS.md.
 
-### How it works
-
-**[AGENTS.md](AGENTS.md) is the single source of truth for all coding agents.** Its bounded, agent-sized entry point gives agents the repository layout, architectural invariants, commands, conventions, and pointers to deeper docs. Agent-specific files (CLAUDE.md, GEMINI.md, Copilot instructions, etc.) are thin pointers back to AGENTS.md.
-
-**Architecture is enforced mechanically, not by convention.** Layering rules, import boundaries, file size limits, and SDK containment are verified by structural tests and lints that run on every change. When rules are enforceable by code, agents follow them reliably.
-
-**The knowledge base is structured for progressive disclosure:**
+**Architecture is enforced mechanically, not by convention.** Layering rules,
+import boundaries, file-size limits, and SDK containment are verified by
+structural tests and lints that run on every change.
 
 ```
 AGENTS.md              Single source of truth — layout, invariants, commands, conventions
-ARCHITECTURE.md        System layout, layering rules, data flows
+ARCHITECTURE.md        System layout, layering rules, data flows, corpus/ key layout
 docs/
-  features/            Feature docs (inputs, outputs, flows, edge cases)
+  features/            Feature docs (document-ingestion, corpus-library, dashboard, …)
   app-workflows.md     User journeys
   dev-workflows.md     Engineering workflows and testing
   SECURITY.md          Security principles
@@ -46,63 +54,40 @@ docs/
   exec-plans/          Execution plans and tech debt tracker
 ```
 
-### Key design decisions
+## How ingestion works
 
-| Principle | Implementation |
-|-----------|---------------|
-| Give agents a single source of truth | AGENTS.md — bounded layout, invariants, commands, conventions |
-| Enforce invariants mechanically | Structural tests + ruff + ESLint verify boundaries |
-| DRY documentation | Each fact lives in one place; no redundant files to drift |
-| Strict layered architecture | `types -> config -> repo -> service -> runtime`, enforced by tests |
-| Prefer boring, composable libraries | stdlib logging over frameworks, Pydantic over ad-hoc validation |
-| Contain external SDKs | `boto3` only in `repo/` layer — verified by structural test |
-| Keep files agent-sized | 300-line limit per file, enforced by test |
-| Docs updated with code | Same-PR requirement prevents documentation rot |
-| Structured observability | JSON logging, `/metrics` endpoint, request tracing |
+```
+corpus/<doc-id>/source.<ext>     raw upload (immutable)
+corpus/<doc-id>/parsed.md        Docling Markdown export
+corpus/<doc-id>/chunks.jsonl     one JSON chunk record per line
+corpus/<doc-id>/manifest.json    status + config + result counts (source of truth)
+```
 
-This approach draws from [OpenAI's experience building with Codex](https://openai.com/index/harness-engineering/): agents work best in environments with strict boundaries, predictable structure, and progressive context disclosure.
+1. **Add a document** — the raw source is written to B2 and a `manifest.json`
+   is created with `status: pending`.
+2. **Ingest** — the API reads the raw bytes back from B2, runs Docling's
+   `DocumentConverter` + `HybridChunker`, and writes `parsed.md` +
+   `chunks.jsonl` next to the source, then flips the manifest to `ingested`.
+3. **Browse** — the detail view shows the raw preview, the rendered Markdown
+   (tables paint), a chunk browser, and the write-amplification ratio.
+
+### First-run model download
+
+The first real ingest downloads Docling's layout/table models (~500 MB–1 GB)
+plus a small chunker tokenizer; subsequent runs use the cache. Ingestion runs on
+device and **auto-detects the accelerator (CUDA → Apple MPS → CPU), defaulting to
+CPU** — no GPU is required. There is **no external API key** and no per-token cost;
+you pay only for B2 storage and egress.
 
 ## Quick Start
 
-You need: Node.js >= 20, pnpm >= 9, Python >= 3.11, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start)**.
+You need: Node.js >= 20, pnpm >= 9, Python >= 3.11, and a free **[Backblaze B2 account](https://www.backblaze.com/sign-up/ai-cloud-storage?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-docling-rag-ingestion)**.
 
 ### Supported local environments
 
 Local scripts are supported on macOS, Linux, and WSL2. Native Windows is not
 supported yet because the dev scripts use POSIX shell syntax and
 `services/api/.venv/bin/*` paths; use WSL2 on Windows.
-
-Cloud or sandboxed coding-agent environments also need permission for dependency
-downloads during `pnpm run setup`. Running the app or Playwright E2E requires
-localhost server binding for the web server on port 3000 and the API on
-8000-8009, plus permission to launch the Playwright Chromium browser. If a
-sandbox denies binding, `pnpm run doctor` and `scripts/pick-port.mjs` report
-`EPERM`/`EACCES` as a permissions issue instead of a busy port. A host without
-IPv6 (many containers) is not treated as a failure — the IPv4 probe decides.
-
-### Start a new project
-
-**Option 1: GitHub Template (recommended)**
-
-Click the green **"Use this template"** button at the top of this repo, name your project, then:
-
-```bash
-git clone https://github.com/yourorg/my-cool-app.git
-cd my-cool-app
-```
-
-**Option 2: Clone and reinitialize**
-
-```bash
-git clone https://github.com/backblaze-b2-samples/vibe-coding-starter-kit.git my-cool-app
-cd my-cool-app
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from vibe-coding-starter-kit"
-```
-
-Either way you get a clean project with no upstream history — ready to push to your own repo and point your agent at it.
 
 ### Setup
 
@@ -124,16 +109,20 @@ overwrites an existing `.env`.
 
 **2. Add your B2 credentials**
 
-Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-oss-start) and:
+Open `.env` and head to the [Backblaze B2 dashboard](https://secure.backblaze.com/b2_buckets.htm?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-docling-rag-ingestion):
 
-1. **Create a bucket.** B2 will show two values — paste each into `.env`:
-   - **Bucket Unique Name** → `B2_BUCKET_NAME`
-   - **Endpoint** → `B2_ENDPOINT`
-2. **Create an application key** with `Read and Write` permission. B2 will show two values — paste each into `.env`:
-   - **keyID** → `B2_KEY_ID`
-   - **applicationKey** → `B2_APPLICATION_KEY` *(only shown once — paste it now)*
+| `.env` key | Where it comes from |
+|---|---|
+| `B2_APPLICATION_KEY_ID` | Application key **keyID** (Read & Write) |
+| `B2_APPLICATION_KEY` | Application key **applicationKey** *(shown once)* |
+| `B2_BUCKET_NAME` | Your bucket's unique name |
+| `B2_REGION` | Bucket region, e.g. `us-west-004` (the S3 endpoint is derived from it) |
+| `B2_PUBLIC_URL_BASE` | *Optional* — public base URL for a public bucket; leave empty for private |
 
-> Want a walkthrough? See the docs for [creating a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets) and [creating app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys).
+The S3-compatible endpoint is derived as `https://s3.<B2_REGION>.backblazeb2.com`,
+so there is no separate endpoint variable to keep in sync.
+
+> Want a walkthrough? See the docs for [creating a bucket](https://www.backblaze.com/docs/cloud-storage-create-and-manage-buckets?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-docling-rag-ingestion) and [creating app keys](https://www.backblaze.com/docs/cloud-storage-create-and-manage-app-keys?utm_source=github&utm_medium=referral&utm_campaign=ai_artifacts&utm_content=b2ai-docling-rag-ingestion).
 
 **3. Run it**
 
@@ -141,45 +130,34 @@ Open `.env` in your editor and keep it visible. Then head to the [Backblaze B2 d
 pnpm dev
 ```
 
-That's it. Frontend at `localhost:3000`, API at `localhost:8000`. Upload a file and see it working. Interactive API docs (Swagger UI) are at `localhost:8000/docs`, with ReDoc at `/redoc`.
+Frontend at `localhost:3000`, API at `localhost:8000`. Open **Documents**, add a
+PDF, click **Ingest**, and watch it fan out into Markdown + chunks on B2.
+Interactive API docs are at `localhost:8000/docs`.
 
-`pnpm dev` runs the preflight check first — it catches the common setup gotchas (wrong Node/Python version, missing venv, missing or placeholder `.env`, ports already taken) and tells you exactly how to fix each one. Run it standalone any time with `pnpm run doctor`.
-
-## Building Your App
-
-When you adapt this kit for a new app, keep the shared scaffolding and only swap out what's app-specific:
-
-- **Keep** the UI kit (`apps/web/src/components/ui/` + design tokens in `globals.css` + `/design`).
-- **Keep** the File Explorer (`/files`) and Upload (`/upload`) pages and their sidebar nav entries — they're the reusable B2-backed surface.
-- **Adapt** the Dashboard (`/`) to your use case — replace the default stats, chart, and recent uploads with metrics that reflect what your app actually does.
-- **Rebrand** by editing a single file: `apps/web/src/lib/app-config.ts` holds the app name and description (`APP_NAME`, `APP_DESCRIPTION`). Changing them there updates the page title, sidebar, and breadcrumb everywhere — no other files to touch.
-
-Full contract and rationale: [AGENTS.md §2 — Building on This Starter Kit](AGENTS.md#2-building-on-this-starter-kit).
+`pnpm dev` runs the preflight check first — it catches common setup gotchas
+(wrong Node/Python version, missing venv, missing or placeholder `.env`, ports
+already taken). Run it standalone any time with `pnpm run doctor`.
 
 ## Core Features
 
-- [File Upload](docs/features/file-upload.md) — drag-and-drop upload with real-time progress
-- [File Browser](docs/features/file-browser.md) — list, preview, download, delete files
-- [Dashboard](docs/features/dashboard.md) — stats cards, upload chart, recent uploads
+- [Document Ingestion](docs/features/document-ingestion.md) — Docling parse + chunk, written back to B2
+- [Corpus Library](docs/features/corpus-library.md) — the scoped `/documents` view over `corpus/`
+- [Dashboard](docs/features/dashboard.md) — ingestion metrics + write amplification
+- [File Upload](docs/features/file-upload.md) — drag-and-drop raw upload demo
+- [File Browser](docs/features/file-browser.md) — full-bucket list, preview, download, delete
 - [Metadata Extraction](docs/features/metadata-extraction.md) — image dimensions, EXIF, PDF info, checksums
-- [Design System](docs/design-system.md) — tokens, primitives, AI elements, the blaze generating loader, and inline `ErrorState` / `EmptyState` patterns. Live preview at `/design`.
-- Inline error handling — fetch failures surface *what's wrong* (API offline, 401, 5xx) and offer a Retry, instead of silently rendering empty state.
-- Single-source config — one `.env` at the repo root powers both API and web app, validated at startup so misconfig fails fast with a readable message.
-- Centralized data layer — every fetch goes through TanStack Query hooks in `apps/web/src/lib/queries.ts`; cache invalidation is one call after a mutation.
-- Checked API contract — `docs/api/openapi.json` plus `pnpm contract:check` catch FastAPI/client route drift.
-- Structural tests — verify layering rules, import boundaries, SDK containment, file size limits
-- Structured JSON logging — every request traced with `request_id` and timing
-- `/health` endpoint — B2 connectivity check
-- `/metrics` endpoint — Prometheus-format counters (request count, latency, uploads)
-- `/docs` + `/redoc` — auto-generated interactive API docs (toggle off in prod with `ENABLE_DOCS=false`)
-- Per-IP rate limiting and magic-byte upload validation — see [SECURITY.md](docs/SECURITY.md)
+- [Design System](docs/design-system.md) — tokens, primitives, loader, error/empty states. Live at `/design`.
+- Centralized data layer — every fetch goes through TanStack Query hooks; no bare `useEffect + fetch`
+- Checked API contract — `docs/api/openapi.json` plus `pnpm contract:check` catch FastAPI/client route drift
+- Structural tests — layering rules, import boundaries, SDK containment, file-size limits
+- `/health` (B2 connectivity) and `/metrics` (Prometheus) endpoints
 
 ## Tech Stack
 
-- TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, Recharts
+- TypeScript, Next.js 16, React 19, Tailwind v4, shadcn/ui, Recharts, react-markdown + remark-gfm
 - TanStack Query — caching, dedup, retry, stale-while-revalidate for every fetch
-- Python 3.11+, FastAPI, boto3, Pydantic v2, Pillow, PyPDF2
-- Backblaze B2 (S3-compatible object storage)
+- Python 3.11+, FastAPI, boto3, Pydantic v2, **Docling + transformers** (on-device parse + chunk)
+- Backblaze B2 (S3-compatible object storage) — source and sink
 - pnpm workspaces (monorepo)
 
 ## Commands
@@ -204,47 +182,32 @@ Full contract and rationale: [AGENTS.md §2 — Building on This Starter Kit](AG
 | `pnpm test:web` | Run frontend unit tests (vitest) |
 | `pnpm test:api` | Run backend tests |
 | `pnpm check:structure` | Verify layering rules |
-| `pnpm test:e2e` | Playwright E2E smoke tests (run `pnpm --filter @vibe-coding-starter-kit/web exec playwright install chromium` once first) |
+| `pnpm test:e2e` | Playwright E2E smoke tests |
 
 Run `pnpm run setup` once before local development, and rerun it after pulling
-dependency changes. It installs workspace dependencies from `pnpm-lock.yaml`
-and API dependencies from `services/api/requirements.lock`. If you add a Node
-dependency yourself, run `pnpm install` to refresh `pnpm-lock.yaml`; for an API
-dependency, follow the reviewed refresh workflow in
-[docs/dev-workflows.md](docs/dev-workflows.md#python-dependency-updates). Run
-`pnpm verify` before opening a PR; it needs
-`services/api/.venv` from setup. Run `pnpm verify:full` when you can start the
-local app stack and browser tests: `.env` must contain real B2 values, local
-server binding must be permitted, Playwright's Chromium browser must be
-installed, and port 3000 must be free (or already serving this app). Playwright
-waits on `http://localhost:3000`,
-but `next dev` falls back to the next free port when 3000 is taken — so an
-unrelated process on 3000 makes the E2E run time out. The API starts at
-`localhost:8000` or the next free port chosen by `scripts/dev.sh`.
+dependency changes. If you add a Node dependency yourself, run `pnpm install` to
+refresh `pnpm-lock.yaml`; for an API dependency, follow the reviewed refresh
+workflow in [docs/dev-workflows.md](docs/dev-workflows.md#python-dependency-updates).
+Run `pnpm verify` before opening a PR; it needs `services/api/.venv` from setup.
+Run `pnpm verify:full` when you can start the local app stack and browser tests.
 
-`pnpm verify` needs neither B2 credentials nor a browser. For parallel agents,
-use one Git worktree per verification run as documented in [the verification
-workflow](docs/dev-workflows.md#non-live-verification). That page also covers
-normal timing, slow-run recovery, and installing the optional local pre-commit
-hooks.
+`pnpm verify` needs neither B2 credentials nor a browser, and it does **not**
+install or import the Docling/torch stack — Docling imports are lazy and the
+ingestion service is tested with the engine stubbed, so the suite stays fast.
+The real parse runs when you `pnpm dev` and ingest a document.
 
 ## Documentation Map
 
 | Doc | Purpose |
 |-----|---------|
 | [AGENTS.md](AGENTS.md) | Agent table of contents — start here |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System layout, layering, data flows |
-| [docs/features/](docs/features/) | Feature docs (upload, browser, dashboard, metadata) |
-| [docs/design-system.md](docs/design-system.md) | Design tokens, primitives, AI elements, loader, error/empty states |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System layout, layering, data flows, corpus/ key layout |
+| [docs/features/](docs/features/) | Feature docs (ingestion, corpus library, dashboard, upload, browser, metadata) |
 | [docs/app-workflows.md](docs/app-workflows.md) | User journeys |
 | [docs/dev-workflows.md](docs/dev-workflows.md) | Engineering workflows and testing |
 | [docs/SECURITY.md](docs/SECURITY.md) | Security principles |
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | Reliability expectations |
 | [docs/exec-plans/](docs/exec-plans/) | Execution plans and tech debt tracker |
-
-## Contributing
-
-Start with [AGENTS.md](AGENTS.md). It's the map — everything else is discoverable from there. For local commit hooks, follow [the pre-commit workflow](docs/dev-workflows.md#pre-commit).
 
 ## License
 

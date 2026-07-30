@@ -4,12 +4,12 @@ import type {
   FileMetadataDetail,
   FileUploadResponse,
   UploadStats,
-} from "@vibe-coding-starter-kit/shared";
+} from "@docling-rag-ingestion/shared";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type ApiClientRoute = {
-  method: "delete" | "get" | "post";
+  method: "delete" | "get" | "patch" | "post";
   path: string;
 };
 
@@ -28,6 +28,17 @@ export const API_CLIENT_ROUTES = {
   legacyFileMetadata: { method: "get", path: "/files/{key}" },
   legacyFileDelete: { method: "delete", path: "/files/{key}" },
   upload: { method: "post", path: "/upload" },
+  // Document ingestion (Docling). Fetch fns live in lib/document-api.ts.
+  documents: { method: "get", path: "/documents" },
+  documentStats: { method: "get", path: "/documents/stats" },
+  createDocument: { method: "post", path: "/documents" },
+  document: { method: "get", path: "/documents/{doc_id}" },
+  documentParsed: { method: "get", path: "/documents/{doc_id}/parsed" },
+  documentChunks: { method: "get", path: "/documents/{doc_id}/chunks" },
+  documentSource: { method: "get", path: "/documents/{doc_id}/source" },
+  ingestDocument: { method: "post", path: "/documents/{doc_id}/ingest" },
+  updateDocumentConfig: { method: "patch", path: "/documents/{doc_id}/config" },
+  deleteDocument: { method: "delete", path: "/documents/{doc_id}" },
 } as const satisfies Record<string, ApiClientRoute>;
 
 /** Typed API error with HTTP status code for caller-side branching. */
@@ -75,7 +86,7 @@ function networkError(): ApiError {
   );
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, init);

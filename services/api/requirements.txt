@@ -12,6 +12,13 @@ boto3>=1.35.0
 Pillow>=11.0.0
 PyPDF2>=3.0.0
 
+# Document ingestion (the sample's headline capability). Docling pulls a large
+# transitive ML stack (torch/torchvision, etc.) captured in requirements.lock;
+# imports are lazy in app/repo/docling_engine.py so verify:api needs none of it.
+# transformers backs the HybridChunker's token-aware chunking tokenizer.
+docling>=2.7.0
+transformers>=4.40.0
+
 # Dev / quality
 ruff>=0.8.0
 pytest>=8.0.0

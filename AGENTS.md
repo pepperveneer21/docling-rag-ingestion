@@ -19,22 +19,34 @@ docs/exec-plans/   Execution plans and tech debt tracker
 infra/railway/     Deployment config
 ```
 
-## 2. Building on This Starter Kit
+**Ingestion pipeline (this app's primary feature):** Docling parse+chunk lives in
+`services/api/app/repo/docling_engine.py` (external SDK, lazy imports, CPU-default
+device auto-detect) and `repo/corpus.py` (S3 storage scoped to `corpus/`);
+orchestration in `service/ingestion.py` + `service/document_stats.py`; routes in
+`runtime/documents.py`. Frontend under `apps/web/src/components/documents/`, with
+data fetching in `lib/document-api.ts` + `lib/document-queries.ts` (the document
+domain's TanStack Query hooks). B2 is source AND sink; boto3 stays in `repo/`.
 
-When this repo is used as the foundation for a new app, the following pieces are part of the starter contract — keep them. Adapt only what the new use case actually requires.
+## 2. App surfaces & the starter contract
+
+This repo is the **Docling RAG Ingestion** app, built on the B2 starter kit. The
+Dashboard was adapted to ingestion metrics and a **Documents (Corpus)** surface
+plus the ingestion pipeline were added. The reusable B2 scaffolding below is
+retained by contract — keep it; adapt only what the use case requires.
 
 **Keep as-is (do not strip, rename, or replace)**
 - **UI kit / design system.** `apps/web/src/components/ui/` (shadcn primitives), the design tokens in `apps/web/src/app/globals.css`, and the `/design` reference page. Build new screens with these primitives; never edit the generated `components/ui/` files directly. Restyling happens through tokens in `globals.css`.
 - **File Explorer.** `/files` route, `apps/web/src/app/files/`, and `apps/web/src/components/files/`. The Files sidebar entry in `apps/web/src/components/layout/app-sidebar.tsx` stays.
 - **Upload.** `/upload` route, `apps/web/src/app/upload/`, and `apps/web/src/components/upload/`. The Upload sidebar entry stays.
-- The sidebar nav itself (Dashboard, Upload, Files, Settings, plus the Design System utility link).
+- The sidebar nav itself keeps Upload, Files, Settings, and the Design System link (this app inserts **Documents** between Dashboard and Upload).
 
-**Adapt to the new use case**
-- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` (stats cards, upload chart, recent uploads table) are illustrative defaults. Replace them with metrics, charts, and tables that reflect what the new app actually does (e.g. transcripts processed, embeddings indexed, classifications run). New aggregations must flow through the same `runtime -> service -> repo` layering and be exposed via TanStack Query hooks in `apps/web/src/lib/queries.ts` — no bare `useEffect + fetch`.
+**Adapted for this app**
+- **Dashboard.** `/` route and `apps/web/src/components/dashboard/` now show ingestion metrics (documents, ingested/pending, total chunks) and a write-amplification panel, driven by `GET /documents/stats`. New aggregations flow through the same `runtime -> service -> repo` layering and TanStack Query hooks — no bare `useEffect + fetch`.
+- **Documents (Corpus).** `/documents` is the scoped corpus library over the `corpus/` prefix — added alongside (not replacing) the full-bucket `/files` Explorer.
 - Update `docs/features/dashboard.md` in the same PR as any dashboard change (see §9).
 
 **Why this contract exists**
-- The UI kit, Files, and Upload pages are the reusable B2-backed scaffolding that makes this a starter kit — stripping them defeats the purpose. The dashboard is the only screen explicitly designed to be rewritten per app.
+- The UI kit, Files, and Upload pages are the reusable B2-backed scaffolding — stripping them defeats the purpose. The dashboard is the screen explicitly designed to be rewritten per app; here it carries the ingestion metrics.
 
 ## 3. Architectural Invariants
 
@@ -49,7 +61,7 @@ When this repo is used as the foundation for a new app, the following pieces are
 
 **Frontend**: shadcn/ui components in `src/components/ui/` are generated — never modify them.
 
-**Data fetching**: every API call flows through TanStack Query hooks in `apps/web/src/lib/queries.ts`. No bare `useEffect + fetch` patterns. Frontend-consumed endpoints update `runtime/<router>.py`, `lib/api-client.ts` (`API_CLIENT_ROUTES`), `lib/queries.ts`, and `docs/api/openapi.json`.
+**Data fetching**: every API call flows through TanStack Query hooks — `apps/web/src/lib/queries.ts` for the files/upload domain, `apps/web/src/lib/document-queries.ts` for the documents domain. No bare `useEffect + fetch` patterns. Frontend-consumed endpoints update `runtime/<router>.py`, `lib/api-client.ts` (`API_CLIENT_ROUTES`), the relevant queries file, and `docs/api/openapi.json`.
 
 **API contract**: *every* route change — including backend-only routes — re-exports `docs/api/openapi.json` (`pnpm contract:export`), or `pnpm test:api` fails. A backend-only route additionally goes in `SERVER_ONLY_OPERATIONS` in `apps/web/src/lib/api-contract.test.ts`, or `pnpm test:web` fails.
 
