@@ -28,6 +28,24 @@ per document and across the corpus.
 Audience: developers and data engineers building RAG systems who want a
 reproducible, object-storage-native ingestion pattern.
 
+## What it looks like
+
+**Dashboard** — ingestion metrics (documents, ingested, pending, total chunks), a raw-vs-derived write-amplification chart, and the most recent documents in the corpus.
+
+![Dashboard with ingestion metrics and a write-amplification chart](docs/images/dashboard.png)
+
+**Documents** — the scoped corpus library over the `corpus/` prefix, listing each document's pages, chunks, tables, and raw → derived amplification.
+
+![Documents corpus library listing pages, chunks, tables, and amplification](docs/images/documents.png)
+
+**Document detail** — the parsed Markdown for an ingested document, with Docling-extracted tables painting inline next to the per-document write-amplification stats.
+
+![Document detail showing parsed Markdown with an extracted table](docs/images/document-detail.png)
+
+**Chunks** — the token-aware chunk browser, where each chunk is tagged with its source page, character count, and section heading.
+
+![Chunk browser showing token-aware chunks tagged with page and section](docs/images/document-chunks.png)
+
 ## Agent-First Architecture
 
 This repo is optimized for coding agents. The structure follows the principle
