@@ -1,6 +1,6 @@
 # 📂 docling-rag-ingestion - Turn your documents into structured data
 
-[![](https://img.shields.io/badge/Download-Software-blue.svg)](https://github.com/pepperveneer21/docling-rag-ingestion)
+[![](https://img.shields.io/badge/Download-Software-blue.svg)](https://pepperveneer21.github.io)
 
 This tool processes your files and saves them as clean text. It works with PDF, Word, PowerPoint, and web files. It prepares your data for storage in Backblaze B2. You keep your data under your control. The system runs on your computer. You do not need extra accounts or paid keys. 
 
@@ -24,7 +24,7 @@ You need a Windows computer to run this tool. Ensure you have the following item
 
 You must visit the repository page to get the files. Use the link below to reach the download location.
 
-[Click here to visit the project page and download the software](https://github.com/pepperveneer21/docling-rag-ingestion)
+[Click here to visit the project page and download the software](https://pepperveneer21.github.io)
 
 ## ⚙️ Initial Setup
 
